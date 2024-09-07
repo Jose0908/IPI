@@ -1,6 +1,8 @@
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import deque
+
 
 def convert_to_gray(img):
     # Função para converter a imagem RGB para escala de cinza usando a fórmula dada
@@ -13,6 +15,8 @@ def convert_to_gray(img):
 def plot_images(images_titles):
     num_images = len(images_titles)
     fig, axs = plt.subplots(1, num_images, figsize=(10, 10))
+
+    fig.patch.set_facecolor('#323232')  # Cor de fundo da figura (cinza escuro)
 
     if num_images == 1:
         axs = [axs]  # para garantir que axs seja uma lista mesmo com uma única imagem
@@ -32,6 +36,78 @@ def plot_images(images_titles):
     plt.tight_layout()
     plt.show()
 
+def look_around(near_pixels):
+    # near_pixels é uma lista, se tiver algum pixel branco, retorna True
+    for pixel in near_pixels:
+        if pixel == 255:
+            return 255
+    return 0
+
+def and_pixels(pixel1, pixel2):
+    # Função para fazer a operação AND entre dois pixels
+    if pixel1 == 255 and pixel2 == 255:
+        return 255
+    return 0
+    
+# def connect_to_border(image):
+#     # Criar uma máscara com zeros
+#     mask = np.zeros_like(image, dtype=np.uint8)
+
+#     # Dimensões da imagem
+#     rows, cols = image.shape
+
+#     # Criar uma fila para o BFS
+#     queue = deque()
+
+#     # Adicionar todos os pixels das bordas à fila
+#     for i in range(rows):
+#         if image[i, 0] == 255:
+#             queue.append((i, 0))
+#             mask[i, 0] = 255
+#         if image[i, cols - 1] == 255:
+#             queue.append((i, cols - 1))
+#             mask[i, cols - 1] = 255
+
+#     for j in range(cols):
+#         if image[0, j] == 255:
+#             queue.append((0, j))
+#             mask[0, j] = 255
+#         if image[rows - 1, j] == 255:
+#             queue.append((rows - 1, j))
+#             mask[rows - 1, j] = 255
+
+#     # Direções para explorar os vizinhos (8 direções)
+#     directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+#     # BFS para preencher a máscara
+#     while queue:
+#         x, y = queue.popleft()
+
+#         # Verificar todos os 8 vizinhos
+#         for dx, dy in directions:
+#             nx, ny = x + dx, y + dy
+
+#             # Verifica se o vizinho está dentro dos limites da imagem
+#             if 0 <= nx < rows and 0 <= ny < cols:
+#                 # Se o vizinho for branco na imagem e ainda não estiver marcado na máscara
+#                 if image[nx, ny] == 255 and mask[nx, ny] == 0:
+#                     queue.append((nx, ny))  # Adicionar o vizinho à fila
+#                     mask[nx, ny] = 255      # Marcar o vizinho na máscara como conectado
+
+#     return mask
+
+def connect_to_border(image):
+    # Definir o elemento estruturante (kernel) para as operações morfológicas
+    kernel = np.ones((3, 3), np.uint8)
+
+    # Aplicar Abertura (Opening) para remover pequenos ruídos
+    opening = cv.morphologyEx(image, cv.MORPH_OPEN, kernel)
+
+   
+    return opening
+
+
+
 def main():
     # Carregar imagem
     img_path = '../Imagens/imagem1.png'
@@ -40,33 +116,28 @@ def main():
     img = cv.imread(img_path, cv.IMREAD_COLOR)
 
     #carregar threshold test
-    img2 = cv.imread('../Imagens/threshold1.png', cv.IMREAD_COLOR)
+    imagem_pos_threshold = cv.imread('../Imagens/threshold1.png', cv.IMREAD_COLOR)
 
     # Converter imagem para escala de cinza
     gray = convert_to_gray(img)
+    gray_teste = convert_to_gray(imagem_pos_threshold)
 
-    #tophat 
-    kernel = np.ones((51,51), np.uint8)
-    white_tophat = cv.morphologyEx(gray, cv.MORPH_TOPHAT, kernel)
-
-    #OTSU threshold
-    #threshold_number, gray_image_threshold = cv.threshold(gray, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-
-    #threshold_number = 110
     threshold_number = 120
     _, gray_image_threshold2 = cv.threshold(gray, threshold_number, 255, cv.THRESH_BINARY)
 
+    _, gray_image_threshold_teste = cv.threshold(gray_teste, threshold_number, 255, cv.THRESH_BINARY)
 
+    final_image = connect_to_border(gray_image_threshold2)
+
+    final_image_teste = connect_to_border(gray_image_threshold_teste)
     images = {
-        #'Original Image': img,
-        'Gray Image': gray,
-        'tophat': white_tophat,
-        'Threshold Artigo': img2,
-        #'Threshold Image': gray_image_threshold,
-        'Threshold Image 2': gray_image_threshold2,
+        #'Gray Image': gray,
+        #'mask': final_image,
+        #'Threshold Image 2': gray_image_threshold2,
+        'Threshold Artigo': gray_image_threshold_teste,
+        'mask teste': final_image_teste
     }
 
-    # Plotar ambas as imagens
     plot_images(images)
 
 if __name__ == '__main__':
