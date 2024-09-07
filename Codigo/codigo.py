@@ -50,8 +50,8 @@ def and_pixels(pixel1, pixel2):
     return 0
 
 def connect_to_border(image):
-    # Fazer dilatação na imagem
     kernel = np.ones((2, 2), np.uint8)
+    # Fazer dilatação na imagem
     image = cv.dilate(image, kernel, iterations=1)
 
     # Criar uma máscara com zeros
@@ -114,25 +114,36 @@ def main():
     # Carregar threshold da imagem do artigo
     image_threshold_artigo = cv.imread('../Imagens/threshold-print.png', cv.IMREAD_COLOR)
 
+    # Carregar a imagem print do artigo
+    image_threshold_artigo2 = cv.imread('../Imagens/threshold-print2.png', cv.IMREAD_COLOR)
+
     # Converter imagem para escala de cinza
     gray_nossa = convert_to_gray(img)
     gray_artigo = convert_to_gray(image_threshold_artigo)
+    gray_artigo2 = convert_to_gray(image_threshold_artigo2)
 
     # Aplicar limiarização de Otsu
     _, thresholded_nossa = cv.threshold(gray_nossa, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
     _, thresholded_artigo = cv.threshold(gray_artigo, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    _, thresholded_artigo2 = cv.threshold(gray_artigo2, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
     # Conectar a borda
     road_mask = connect_to_border(thresholded_artigo)
     road_mask_nossa = connect_to_border(thresholded_nossa)
 
+    # Aplicar a dilatação na máscara
+    kernel = np.ones((3, 3), np.uint8)
+    road_mask2 = cv.dilate(road_mask, kernel, iterations=1)
+
     # Mostrar as imagens
     images = {
-        'Imagem Tons de Cinza Nossa': gray_nossa,
-        'Threshold Imagem Nossa': thresholded_nossa,
+        #'Imagem Tons de Cinza Nossa': gray_nossa,
+        #'Threshold Imagem Nossa': thresholded_nossa,
         'Threshold Artigo': thresholded_artigo,
-        'Imagem Sem Ruído Nossa': road_mask_nossa,
-        'Imagem Sem Ruído Artigo': road_mask
+        #'Imagem Sem Ruído Nossa': road_mask_nossa,
+        'Imagem Sem Ruído Artigo Print:': thresholded_artigo2,
+        'Imagem Sem Ruído Artigo': road_mask,
+        'Imagem Sem Ruído Artigo Depois da Dilatação': road_mask2
     }
     plot_images(images)
 
