@@ -48,97 +48,94 @@ def and_pixels(pixel1, pixel2):
     if pixel1 == 255 and pixel2 == 255:
         return 255
     return 0
-    
-# def connect_to_border(image):
-#     # Criar uma máscara com zeros
-#     mask = np.zeros_like(image, dtype=np.uint8)
-
-#     # Dimensões da imagem
-#     rows, cols = image.shape
-
-#     # Criar uma fila para o BFS
-#     queue = deque()
-
-#     # Adicionar todos os pixels das bordas à fila
-#     for i in range(rows):
-#         if image[i, 0] == 255:
-#             queue.append((i, 0))
-#             mask[i, 0] = 255
-#         if image[i, cols - 1] == 255:
-#             queue.append((i, cols - 1))
-#             mask[i, cols - 1] = 255
-
-#     for j in range(cols):
-#         if image[0, j] == 255:
-#             queue.append((0, j))
-#             mask[0, j] = 255
-#         if image[rows - 1, j] == 255:
-#             queue.append((rows - 1, j))
-#             mask[rows - 1, j] = 255
-
-#     # Direções para explorar os vizinhos (8 direções)
-#     directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
-
-#     # BFS para preencher a máscara
-#     while queue:
-#         x, y = queue.popleft()
-
-#         # Verificar todos os 8 vizinhos
-#         for dx, dy in directions:
-#             nx, ny = x + dx, y + dy
-
-#             # Verifica se o vizinho está dentro dos limites da imagem
-#             if 0 <= nx < rows and 0 <= ny < cols:
-#                 # Se o vizinho for branco na imagem e ainda não estiver marcado na máscara
-#                 if image[nx, ny] == 255 and mask[nx, ny] == 0:
-#                     queue.append((nx, ny))  # Adicionar o vizinho à fila
-#                     mask[nx, ny] = 255      # Marcar o vizinho na máscara como conectado
-
-#     return mask
 
 def connect_to_border(image):
-    # Definir o elemento estruturante (kernel) para as operações morfológicas
-    kernel = np.ones((3, 3), np.uint8)
+    # Fazer dilatação na imagem
+    kernel = np.ones((2, 2), np.uint8)
+    image = cv.dilate(image, kernel, iterations=1)
 
-    # Aplicar Abertura (Opening) para remover pequenos ruídos
-    opening = cv.morphologyEx(image, cv.MORPH_OPEN, kernel)
+    # Criar uma máscara com zeros
+    mask = np.zeros_like(image, dtype=np.uint8)
 
-   
-    return opening
+    # Dimensões da imagem
+    rows, cols = image.shape
 
+    # Criar uma fila para o BFS
+    queue = deque()
 
+    # Adicionar todos os pixels das bordas à fila
+    for i in range(rows):
+        if image[i, 0] == 255:
+            queue.append((i, 0))
+            mask[i, 0] = 255
+        if image[i, cols - 1] == 255:
+            queue.append((i, cols - 1))
+            mask[i, cols - 1] = 255
+
+    for j in range(cols):
+        if image[0, j] == 255:
+            queue.append((0, j))
+            mask[0, j] = 255
+        if image[rows - 1, j] == 255:
+            queue.append((rows - 1, j))
+            mask[rows - 1, j] = 255
+
+    # Direções para explorar os vizinhos (8 direções)
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+    # BFS para preencher a máscara
+    while queue:
+        x, y = queue.popleft()
+
+        # Verificar todos os 8 vizinhos
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+
+            # Verifica se o vizinho está dentro dos limites da imagem
+            if 0 <= nx < rows and 0 <= ny < cols:
+                # Se o vizinho for branco na imagem e ainda não estiver marcado na máscara
+                if image[nx, ny] == 255 and mask[nx, ny] == 0:
+                    queue.append((nx, ny))  # Adicionar o vizinho à fila
+                    mask[nx, ny] = 255      # Marcar o vizinho na máscara como conectado
+
+    # Erosão na máscara
+    kernel = np.ones((1, 1), np.uint8)
+    mask = cv.erode(mask, kernel, iterations=1)
+
+    return mask
 
 def main():
     # Carregar imagem
-    img_path = '../Imagens/imagem1.png'
+    img_path = '../Imagens/imagem-original.png'
 
     # Carregar imagem em RGB (OpenCV lê em BGR por padrão)
     img = cv.imread(img_path, cv.IMREAD_COLOR)
 
-    #carregar threshold test
-    imagem_pos_threshold = cv.imread('../Imagens/threshold1.png', cv.IMREAD_COLOR)
+    # Carregar threshold da imagem do artigo
+    image_threshold_artigo = cv.imread('../Imagens/threshold-print.png', cv.IMREAD_COLOR)
 
     # Converter imagem para escala de cinza
-    gray = convert_to_gray(img)
-    gray_teste = convert_to_gray(imagem_pos_threshold)
+    gray_nossa = convert_to_gray(img)
+    gray_artigo = convert_to_gray(image_threshold_artigo)
 
-    threshold_number = 120
-    _, gray_image_threshold2 = cv.threshold(gray, threshold_number, 255, cv.THRESH_BINARY)
+    # Aplicar limiarização de Otsu
+    _, thresholded_nossa = cv.threshold(gray_nossa, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    _, thresholded_artigo = cv.threshold(gray_artigo, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
-    _, gray_image_threshold_teste = cv.threshold(gray_teste, threshold_number, 255, cv.THRESH_BINARY)
+    # Conectar a borda
+    road_mask = connect_to_border(thresholded_artigo)
+    road_mask_nossa = connect_to_border(thresholded_nossa)
 
-    final_image = connect_to_border(gray_image_threshold2)
-
-    final_image_teste = connect_to_border(gray_image_threshold_teste)
+    # Mostrar as imagens
     images = {
-        #'Gray Image': gray,
-        #'mask': final_image,
-        #'Threshold Image 2': gray_image_threshold2,
-        'Threshold Artigo': gray_image_threshold_teste,
-        'mask teste': final_image_teste
+        'Imagem Tons de Cinza Nossa': gray_nossa,
+        'Threshold Imagem Nossa': thresholded_nossa,
+        'Threshold Artigo': thresholded_artigo,
+        'Imagem Sem Ruído Nossa': road_mask_nossa,
+        'Imagem Sem Ruído Artigo': road_mask
     }
-
     plot_images(images)
 
+# Função principal
 if __name__ == '__main__':
     main()
