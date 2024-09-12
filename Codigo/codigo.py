@@ -98,11 +98,24 @@ def connect_to_border(image):
                     queue.append((nx, ny))  # Adicionar o vizinho à fila
                     mask[nx, ny] = 255      # Marcar o vizinho na máscara como conectado
 
-    # Erosão na máscara
-    kernel = np.ones((1, 1), np.uint8)
-    mask = cv.erode(mask, kernel, iterations=1)
-
     return mask
+
+def remove_small_components(image, min_area):
+    """
+    Remove componentes conectados que têm área menor que `min_area`.
+    """
+    # Detectar componentes conectados
+    num_labels, labels, stats, _ = cv.connectedComponentsWithStats(image, connectivity=8)
+
+    # Crie uma máscara para os componentes maiores que min_area
+    cleaned_image = np.zeros_like(image, dtype=np.uint8)
+
+    for i in range(1, num_labels):  # Ignorar o fundo (label 0)
+        area = stats[i, cv.CC_STAT_AREA]
+        if area >= min_area:
+            cleaned_image[labels == i] = 255
+
+    return cleaned_image
 
 def main():
     # Carregar imagem
@@ -112,38 +125,67 @@ def main():
     img = cv.imread(img_path, cv.IMREAD_COLOR)
 
     # Carregar threshold da imagem do artigo
-    image_threshold_artigo = cv.imread('../Imagens/threshold-print.png', cv.IMREAD_COLOR)
+    image_threshold_print = cv.imread('../Imagens/threshold-print.png', cv.IMREAD_COLOR)
 
     # Carregar a imagem print do artigo
-    image_threshold_artigo2 = cv.imread('../Imagens/threshold-print2.png', cv.IMREAD_COLOR)
+    image_removed_noise_print = cv.imread('../Imagens/removed-noise-print2.png', cv.IMREAD_COLOR)
 
     # Converter imagem para escala de cinza
     gray_nossa = convert_to_gray(img)
-    gray_artigo = convert_to_gray(image_threshold_artigo)
-    gray_artigo2 = convert_to_gray(image_threshold_artigo2)
+    gray_artigo = convert_to_gray(image_threshold_print)
+    gray_artigo2 = convert_to_gray(image_removed_noise_print)
 
     # Aplicar limiarização de Otsu
     _, thresholded_nossa = cv.threshold(gray_nossa, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-    _, thresholded_artigo = cv.threshold(gray_artigo, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-    _, thresholded_artigo2 = cv.threshold(gray_artigo2, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    _, thresholded_print = cv.threshold(gray_artigo, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    _, removed_noise_print = cv.threshold(gray_artigo2, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+
+    # Remover pequenos componentes conectados à borda (ajustar `min_area` conforme necessário)
+    min_area = 100  # Ajuste o valor conforme necessário
+    cleaned_mask = remove_small_components(thresholded_print, min_area)
+    cleaned_mask2 = remove_small_components(thresholded_nossa, min_area)
 
     # Conectar a borda
-    road_mask = connect_to_border(thresholded_artigo)
-    road_mask_nossa = connect_to_border(thresholded_nossa)
+    road_mask = connect_to_border(cleaned_mask)
+    road_mask2 = connect_to_border(cleaned_mask2)
 
-    # Aplicar a dilatação na máscara
+    # Mostrar a imagem original e a máscara resultante
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.title('Imagem Original')
+    plt.imshow(thresholded_print, cmap='gray')
+
+    plt.subplot(1, 2, 2)
+    plt.title('Imagem Limpa (Sem Pequenos Componentes)')
+    plt.imshow(cleaned_mask, cmap='gray')
+
+    plt.show()
+
+    # Mostrar a imagem original e a máscara resultante
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.title('Imagem Original Nossa')
+    plt.imshow(thresholded_nossa, cmap='gray')
+
+    plt.subplot(1, 2, 2)
+    plt.title('Imagem Limpa (Sem Pequenos Componentes) Nossa')
+    plt.imshow(cleaned_mask2, cmap='gray')
+
+    plt.show()
+
+    # Operação de expansão com vizinhança de oito pixels (dilatação com kernel 3x3)
     kernel = np.ones((3, 3), np.uint8)
-    road_mask2 = cv.dilate(road_mask, kernel, iterations=1)
+    dilated_image = cv.dilate(road_mask, kernel, iterations=1)
 
     # Mostrar as imagens
     images = {
         #'Imagem Tons de Cinza Nossa': gray_nossa,
         #'Threshold Imagem Nossa': thresholded_nossa,
-        'Threshold Artigo': thresholded_artigo,
+        'Threshold Artigo Print': thresholded_print,
         #'Imagem Sem Ruído Nossa': road_mask_nossa,
-        'Imagem Sem Ruído Artigo Print:': thresholded_artigo2,
+        'Imagem Sem Ruído Artigo Print:': removed_noise_print,
         'Imagem Sem Ruído Artigo': road_mask,
-        'Imagem Sem Ruído Artigo Depois da Dilatação': road_mask2
+        #'Imagem Sem Ruído Artigo Depois da Dilatação': road_mask2
     }
     plot_images(images)
 
