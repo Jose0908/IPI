@@ -2,6 +2,8 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
+from skimage.morphology import skeletonize
+
 
 def inverter_canal(canal):
     # Função para inverter o canal de cor
@@ -14,7 +16,7 @@ def getGrayPixels(image):
     s_invertido = inverter_canal(hsv[:, :, 1])
 
     #mostrar hsv
-    fig, axs = plt.subplots(1, 3, figsize=(30, 10))
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
     fig.patch.set_facecolor('#323232')  # Cor de fundo da figura (cinza escuro)
     axs[0].imshow(hsv[:, :, 0], cmap='gray', vmin=0, vmax=255)
     axs[0].set_title('H')
@@ -223,32 +225,6 @@ def morphological_gradient(image):
 def contour_image(gray_image, contour):
     return cv.bitwise_or(gray_image, contour)
 
-def skeletonize(image):
-    # Elemento estruturante
-    kernel = cv.getStructuringElement(cv.MORPH_CROSS, (3, 3))
-
-    # Inicializa o flag de mudança
-    has_changed = True
-
-    # Loop até não haver mais mudanças
-    while has_changed:
-        # Aplica a dilatação
-        dilation = cv.dilate(image, kernel, iterations=1)
-
-        # Aplica a erosão
-        erosion = cv.erode(image, kernel, iterations=1)
-
-        # Subtrai a erosão da dilatação
-        temp = cv.subtract(image, erosion)
-
-        # Atualiza o flag de mudança
-        has_changed = cv.countNonZero(temp) > 0
-
-        # Atualiza a imagem
-        image = cv.bitwise_and(image, temp)
-
-    return image
-
 # Função para calcular a razão área/perímetro
 def calculate_ratio(contour):
     area = cv.contourArea(contour)
@@ -258,59 +234,57 @@ def calculate_ratio(contour):
     return np.sqrt(area) / perimeter
 
 def main():
-    img = cv.imread('../Imagens/imagem-teste1.png', cv.IMREAD_COLOR)
+    img = cv.imread('../Imagens/imagem-teste10.png', cv.IMREAD_COLOR)
     thresholded_nossa = getGrayPixels(img) 
     # Mostrar thresholded_nossa
-    plot_images({'Imagem Original': img, 'Imagem Thresholded': thresholded_nossa})
-    
-    #img = brightGray(img)
-    # Converter imagem para escala de cinza
-    #gray_nossa = convert_to_gray(img)   
-    # Aplicar limiarização de Otsu
-    #_, thresholded_nossa = cv.threshold(gray_nossa, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    #plot_images({'Imagem Original': img, 'Imagem Thresholded': thresholded_nossa})
 
     # Remover pequenos componentes conectados à borda (ajustar `min_area` conforme necessário)
     min_area = 80  
     cleaned_mask = remove_small_components(thresholded_nossa, min_area)
     #Mostrar a imagem limpa
-    plot_images({'Imagem Original': thresholded_nossa, 'Imagem Limpa': cleaned_mask})
+    #plot_images({'Imagem Original': thresholded_nossa, 'Imagem Limpa': cleaned_mask})
 
     # Conectar a borda
     road_mask = connect_to_border(cleaned_mask)
     #Mostrar a imagem conectada
-    plot_images({'Imagem Original': cleaned_mask, 'Imagem Conectada': road_mask})
+    #plot_images({'Imagem Original': cleaned_mask, 'Imagem Conectada': road_mask})
 
     # Dilatar a imagem
     kernel = np.ones((3, 3), np.uint8)
     dilated_image_nossa = cv.dilate(road_mask, kernel, iterations=1)
     #Mostrar a imagem dilatada
-    plot_images({'Imagem Original': road_mask, 'Imagem Dilatada': dilated_image_nossa})
+    #plot_images({'Imagem Original': road_mask, 'Imagem Dilatada': dilated_image_nossa})
 
     # Fechar buracos pequenos
-    min_area = 170  
+    #min area é o raiz do tamanho da imagem dividido por 2
+    tamanho_imagem = np.sqrt(img.shape[0] * img.shape[1])
+    min_area = tamanho_imagem // 2
+    #min_area = 170
     dilated_image_nossa2 = closeSmallHoles(dilated_image_nossa, min_area)
     #Mostrar a imagem com buracos fechados
-    plot_images({'Imagem Original': dilated_image_nossa, 'Imagem com Buracos Fechados': dilated_image_nossa2})
+    #plot_images({'Imagem Original': dilated_image_nossa, 'Imagem com Buracos Fechados': dilated_image_nossa2})
 
-    # Aplicar uma dilatacao
+    # Aplicar um fechamento
     kernel = np.ones((5, 5), np.uint8)
     opening_nossa = cv.morphologyEx(dilated_image_nossa2, cv.MORPH_CLOSE, kernel)
-    #Mostrar a imagem com dilatacao
-    plot_images({'Imagem Original': dilated_image_nossa2, 'Imagem com Dilatacao': opening_nossa})
+    #Mostrar a imagem com fechamento
+    #plot_images({'Imagem Original': dilated_image_nossa2, 'Imagem com Fechamento': opening_nossa})
 
     # Encontrar os contornos das regiões brancas
     contours_nossa, _ = cv.findContours(opening_nossa, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+    #ratios = [calculate_ratio(cnt) for cnt in contours_nossa]
+    #print (ratios)
     #Mostrar os contornos
-    plot_images({'Imagem Original': opening_nossa, 'Contornos': cv.drawContours(np.zeros_like(opening_nossa), contours_nossa, -1, 255, thickness=2)})
+    #plot_images({'Imagem Original': opening_nossa, 'Contornos': cv.drawContours(np.zeros_like(opening_nossa), contours_nossa, -1, 255, thickness=2)})
 
     # Filtrar os contornos que podem representar rodovias
     min_ratio = 0.1  # Ajuste esse valor conforme necessário
     #mostrar cada um dos ratios
-    #ratios = [calculate_ratio(cnt) for cnt in contours_nossa]
-    #print(ratios)
+
     road_contours_nossa = [cnt for cnt in contours_nossa if calculate_ratio(cnt) < min_ratio]
     # Mostrar road_contours_nossa 
-    plot_images({'Imagem Original': opening_nossa, 'Road Contours': cv.drawContours(np.zeros_like(opening_nossa), road_contours_nossa, -1, 255, thickness=cv.FILLED)})
+    #plot_images({'Imagem Original': dilated_image_nossa2, 'Road Contours': cv.drawContours(np.zeros_like(dilated_image_nossa2), road_contours_nossa, -1, 255, thickness=cv.FILLED)})
 
     #print (f'Número de rodovias detectadas: {len(road_contours_nossa)}')
 
@@ -320,18 +294,56 @@ def main():
 
     output = cv.subtract(dilated_image_nossa2, output)
     output2 = cv.subtract(dilated_image_nossa2, output)
+    plot_images({'Imagem Original': dilated_image_nossa2, 'Rodovias Extraídas': output2})
 
-    #Exibir o resultado
+    gradient = morphological_gradient(output2)
+
+    #transformar imagem em escala de cinza
+
+    # Sobrepor os contornos brancos na imagem RGB original
+    # O bitwise_or é utilizado para manter os contornos brancos sobre a imagem RGB
+    
+    #converter img para escala de cinza
+    gray_nossa = convert_to_gray(img)
+
+    final_image = cv.bitwise_or(gray_nossa, gradient)
+
+    #converter para rgb
+    final_image = cv.cvtColor(final_image, cv.COLOR_BGR2RGB)
+
+    # Mostrar a imagem final com os contornos sobrepostos
     plt.figure(figsize=(10, 10))
-    plt.imshow(output2, cmap='gray')
+    plt.imshow(final_image)
     plt.title('Rodovias Extraídas')
+    plt.axis('off')  # Oculta os eixos
     plt.show()
 
+    # Normalizar a imagem para 0 e 1 (necessário para a função skeletonize)
+    output2 = output2 // 255
 
-    # gradient = morphological_gradient(output)
-    # gradient2 = morphological_gradient(output2)
+    # Aplicar a esqueletização
+    skeleton = skeletonize(output2)
 
-    # original_contour_image = contour_image(gray_nossa, gradient2)
+    # Converter de volta para 0-255 para exibição com o OpenCV/Matplotlib
+    skeleton = (skeleton * 255).astype(np.uint8)
+
+    # Mostrar a imagem esqueletizada
+    plt.figure(figsize=(10, 10))
+    plt.imshow(skeleton, cmap='gray')
+    plt.title('Imagem Esqueletizada')
+    plt.axis('off')  # Oculta os eixos
+    plt.show()
+
+    # jogar a imagem skeletonizada em cima da imagem original
+
+    final_image2 = cv.bitwise_or(gray_nossa, skeleton)
+    #mostrar
+    final_image2 = cv.cvtColor(final_image2, cv.COLOR_BGR2RGB)
+    plt.figure(figsize=(10, 10))
+    plt.imshow(final_image2)
+    plt.title('Rodovias Extraídas')
+    plt.axis('off')  # Oculta os eixos
+    plt.show()
 
 # Função principal
 if __name__ == '__main__':
