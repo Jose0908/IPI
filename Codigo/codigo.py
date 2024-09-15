@@ -3,6 +3,58 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
 
+def inverter_canal(canal):
+    # Função para inverter o canal de cor
+    return abs(255 - canal)
+
+def getGrayPixels(image):
+    #convert to hsv
+    hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+    
+    s_invertido = inverter_canal(hsv[:, :, 1])
+
+    #mostrar hsv
+    fig, axs = plt.subplots(1, 3, figsize=(30, 10))
+    fig.patch.set_facecolor('#323232')  # Cor de fundo da figura (cinza escuro)
+    axs[0].imshow(hsv[:, :, 0], cmap='gray', vmin=0, vmax=255)
+    axs[0].set_title('H')
+    axs[1].imshow(hsv[:, :, 1], cmap='gray', vmin=0, vmax=255)
+    axs[1].set_title('S')
+    axs[2].imshow(hsv[:, :, 2], cmap='gray', vmin=0, vmax=255)
+    axs[2].set_title('V')
+    plt.show()
+
+    #utilizar OTSU no canal H
+    _, th = cv.threshold(hsv[:, :, 0], 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+
+    #utilizar OTSU no canal S invertido
+    S_invertido = inverter_canal(hsv[:, :, 1])
+    threshold = 210
+    _, th2 = cv.threshold(S_invertido, threshold, 255, cv.THRESH_BINARY)
+
+    # fazer and entre os dois resultados
+    thf = cv.bitwise_and(th, th2)
+
+    return thf
+
+    # plt.subplot(1, 3, 1)
+    # plt.imshow(th, cmap='gray', vmin=0, vmax=255)
+    # plt.title('H binarizado')
+    # plt.axis('off')  # Desativa os eixos
+
+    # Segundo subplot para 'S binarizado'
+    # plt.subplot(1, 3, 2)
+    # plt.imshow(th2, cmap='gray', vmin=0, vmax=255)
+    # plt.title('S binarizado')
+    # plt.axis('off')
+
+    # Terceiro subplot para 'And H e S binarizado'
+    # plt.subplot(1, 3, 3)
+    # plt.imshow(thf, cmap='gray', vmin=0, vmax=255)
+    # plt.title('And H e S binarizado')
+    # plt.axis('off')
+    # plt.show()
+
 def brightGray(image):
     # Converter a imagem para float32 para operações aritméticas precisas
     image = image.astype(np.float32)
@@ -206,65 +258,80 @@ def calculate_ratio(contour):
     return np.sqrt(area) / perimeter
 
 def main():
-    img = cv.imread('../Imagens/imagem-teste3.png', cv.IMREAD_COLOR)
-    img = brightGray(img)
-
-    #image_threshold_print = cv.imread('../Imagens/threshold-print.png', cv.IMREAD_COLOR)
-    #image_removed_noise_print = cv.imread('../Imagens/removed-noise-print2.png', cv.IMREAD_COLOR)
-
+    img = cv.imread('../Imagens/imagem-teste1.png', cv.IMREAD_COLOR)
+    thresholded_nossa = getGrayPixels(img) 
+    # Mostrar thresholded_nossa
+    plot_images({'Imagem Original': img, 'Imagem Thresholded': thresholded_nossa})
+    
+    #img = brightGray(img)
     # Converter imagem para escala de cinza
-    gray_nossa = convert_to_gray(img)
-
+    #gray_nossa = convert_to_gray(img)   
     # Aplicar limiarização de Otsu
-    _, thresholded_nossa = cv.threshold(gray_nossa, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    #_, thresholded_nossa = cv.threshold(gray_nossa, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
     # Remover pequenos componentes conectados à borda (ajustar `min_area` conforme necessário)
     min_area = 80  
-    cleaned_mask2 = remove_small_components(thresholded_nossa, min_area)
+    cleaned_mask = remove_small_components(thresholded_nossa, min_area)
+    #Mostrar a imagem limpa
+    plot_images({'Imagem Original': thresholded_nossa, 'Imagem Limpa': cleaned_mask})
 
     # Conectar a borda
-    road_mask2 = connect_to_border(cleaned_mask2)
+    road_mask = connect_to_border(cleaned_mask)
+    #Mostrar a imagem conectada
+    plot_images({'Imagem Original': cleaned_mask, 'Imagem Conectada': road_mask})
 
+    # Dilatar a imagem
     kernel = np.ones((3, 3), np.uint8)
-    dilated_image_nossa = cv.dilate(road_mask2, kernel, iterations=1)
+    dilated_image_nossa = cv.dilate(road_mask, kernel, iterations=1)
+    #Mostrar a imagem dilatada
+    plot_images({'Imagem Original': road_mask, 'Imagem Dilatada': dilated_image_nossa})
 
     # Fechar buracos pequenos
-    min_area = 570  
+    min_area = 170  
     dilated_image_nossa2 = closeSmallHoles(dilated_image_nossa, min_area)
+    #Mostrar a imagem com buracos fechados
+    plot_images({'Imagem Original': dilated_image_nossa, 'Imagem com Buracos Fechados': dilated_image_nossa2})
 
     # Aplicar uma dilatacao
     kernel = np.ones((5, 5), np.uint8)
     opening_nossa = cv.morphologyEx(dilated_image_nossa2, cv.MORPH_CLOSE, kernel)
+    #Mostrar a imagem com dilatacao
+    plot_images({'Imagem Original': dilated_image_nossa2, 'Imagem com Dilatacao': opening_nossa})
 
     # Encontrar os contornos das regiões brancas
-    contours_nossa, _ = cv.findContours(opening_nossa, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    contours_nossa, _ = cv.findContours(opening_nossa, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+    #Mostrar os contornos
+    plot_images({'Imagem Original': opening_nossa, 'Contornos': cv.drawContours(np.zeros_like(opening_nossa), contours_nossa, -1, 255, thickness=2)})
 
     # Filtrar os contornos que podem representar rodovias
     min_ratio = 0.1  # Ajuste esse valor conforme necessário
-    
     #mostrar cada um dos ratios
-    ratios = [calculate_ratio(cnt) for cnt in contours_nossa]
-    print(ratios)
-
+    #ratios = [calculate_ratio(cnt) for cnt in contours_nossa]
+    #print(ratios)
     road_contours_nossa = [cnt for cnt in contours_nossa if calculate_ratio(cnt) < min_ratio]
+    # Mostrar road_contours_nossa 
+    plot_images({'Imagem Original': opening_nossa, 'Road Contours': cv.drawContours(np.zeros_like(opening_nossa), road_contours_nossa, -1, 255, thickness=cv.FILLED)})
 
-    print (f'Número de rodovias detectadas: {len(road_contours_nossa)}')
+    #print (f'Número de rodovias detectadas: {len(road_contours_nossa)}')
 
     # Criar uma imagem de saída
-    output2 = np.zeros_like(dilated_image_nossa2)
-    cv.drawContours(output2, road_contours_nossa, -1, 255, thickness=cv.FILLED)
+    output = np.zeros_like(dilated_image_nossa2)
+    cv.drawContours(output, road_contours_nossa, -1, 255, thickness=cv.FILLED)
+
+    output = cv.subtract(dilated_image_nossa2, output)
+    output2 = cv.subtract(dilated_image_nossa2, output)
+
+    #Exibir o resultado
+    plt.figure(figsize=(10, 10))
+    plt.imshow(output2, cmap='gray')
+    plt.title('Rodovias Extraídas')
+    plt.show()
 
 
     # gradient = morphological_gradient(output)
     # gradient2 = morphological_gradient(output2)
 
     # original_contour_image = contour_image(gray_nossa, gradient2)
-
-   #Exibir o resultado
-    plt.figure(figsize=(10, 10))
-    plt.imshow(output2, cmap='gray')
-    plt.title('Rodovias Extraídas')
-    plt.show()
 
 # Função principal
 if __name__ == '__main__':
