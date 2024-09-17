@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from collections import deque
 from skimage.morphology import skeletonize
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 SMALL_COMPONENT_MIN_AREA = 80
 
 def plot_images(images_titles):
@@ -50,7 +50,7 @@ def binarize_image(image):
             axs[i].set_title(titles[i])
         plt.show()
 
-    # Binarizar o canal H utlizando OTSU
+    # Binarizar o canal H utilizando OTSU
     _, binarized_H = cv.threshold(hsv[:, :, 0], 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
     # Binarizar o canal S utilizando threshold
@@ -183,7 +183,6 @@ def detect_road(closed_holes_image):
     min_ratio = 0.1  # Ajuste esse valor conforme necessário
 
     road_contours = [cnt for cnt in contours_nossa if calculate_ratio(cnt) < min_ratio]
-
     #print (f'Número de rodovias detectadas: {len(road_contours)}')
 
     # Criar uma imagem de saída
@@ -215,7 +214,7 @@ def skeletonize_image(original_image, roads):
     return skeleton, skeleton_image
 
 def main():
-    img = cv.imread('../Imagens/imagem-teste2.png', cv.IMREAD_COLOR)
+    img = cv.imread('../Imagens/imagem-teste3.png', cv.IMREAD_COLOR)
     # Binarizar a imagem
     thresholded_image = binarize_image(img) 
 
@@ -243,7 +242,7 @@ def main():
     
     if not DEBUG_MODE:
         plot_images({'Imagem Original': img, 'Imagem Binarizada': thresholded_image})
-        plot_images({'Imagem Contornada': contour_line_image, 'Imagem Esqueleto': skeleton_image})
+        plot_images({'Imagem Rodovias Extraídas': roads, 'Imagem Contorno': contour_line_image})
     else:
         # Crie uma cópia das variáveis locais que são imagens antes de iterar
         local_vars = dict(locals())  # Faz uma cópia das variáveis locais
