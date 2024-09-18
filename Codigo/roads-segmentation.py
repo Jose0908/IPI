@@ -244,7 +244,7 @@ def main():
         plot_images({'Imagem Original': img, 'Imagem Binarizada': thresholded_image})
         plot_images({'Imagem Rodovias Extraídas': roads, 'Imagem Contorno': contour_line_image})
     else:
-        # Crie uma cópia das variáveis locais que são imagens antes de iterar
+        # Cópia das variáveis locais que são imagens antes de iterar
         local_vars = dict(locals())  # Faz uma cópia das variáveis locais
         debug_variables = {key: local_vars[key] for key in local_vars if key != 'kernel' and isinstance(local_vars[key], np.ndarray)}
         
